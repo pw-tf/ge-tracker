@@ -1,7 +1,7 @@
 import type { Item } from './types';
 import { flipScore, type ScoreParts } from './score';
 import { afterTax, geTax } from './tax';
-import { confidenceOf, offersOf, tagsOf, type Confidence, type Tag } from './predict';
+import { confidenceOf, offersOf, refPrice, tagsOf, type Confidence, type Tag } from './predict';
 
 export { TAX_CAP, TAX_FLOOR, TAX_RATE, afterTax, breakEvenSell, geTax } from './tax';
 
@@ -104,10 +104,26 @@ export interface Alch {
 
 export type PriceBasis = 'instant' | 'patient';
 
-/** Profit per cast = high alch value − GE price − one nature rune (fire staff assumed). */
+/**
+ * Realistic cost to buy one item for alching. Like flip offers, a last trade that dipped
+ * below the recent average isn't assumed to still be available.
+ *  - instant: pay the ask, never below the recent average ask
+ *  - patient: offer at the bid, never below the recent average bid
+ */
+export function alchBuyPrice(item: Item, basis: PriceBasis): number | null {
+  const last = basis === 'instant' ? item.high : item.low;
+  if (last == null) return null;
+  const ref =
+    basis === 'instant'
+      ? refPrice(item.avgHigh5m, item.volHigh5m, item.avgHigh1h, last)
+      : refPrice(item.avgLow5m, item.volLow5m, item.avgLow1h, last);
+  return Math.max(last, Math.round(ref ?? last));
+}
+
+/** Profit per cast = high alch value − realistic GE price − one nature rune (fire staff assumed). */
 export function alchOf(item: Item, basis: PriceBasis, naturePrice: number, castsPerHour: number): Alch | null {
   if (!item.highalch) return null;
-  const price = basis === 'instant' ? item.high : item.low;
+  const price = alchBuyPrice(item, basis);
   if (price == null) return null;
   const profit = item.highalch - price - naturePrice;
   const limit = item.limit ?? Infinity;

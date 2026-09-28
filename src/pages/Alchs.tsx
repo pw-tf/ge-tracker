@@ -236,7 +236,7 @@ export function AlchsPage() {
             <h2>Buying tips</h2>
             <p className="muted" style={{ margin: 0, lineHeight: 1.55 }}>
               <strong style={{ color: 'var(--text)' }}>Instant buy</strong> fills now at the high price. <strong style={{ color: 'var(--text)' }}>Patient</strong>{' '}
-              offers at the low price: more profit per cast, slower to fill.
+              offers at the low price: more profit per cast, slower to fill. Prices never assume a dip below the recent average is still there.
             </p>
             <p className="muted" style={{ margin: 0, lineHeight: 1.55 }}>
               Cheap items with big buy limits often beat expensive ones on GP/hr, because the limit caps how many expensive items you can cast.

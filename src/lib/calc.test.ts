@@ -126,6 +126,13 @@ describe('alchOf', () => {
     const axe = item({ highalch: 120_000, high: 118_600, limit: 70 });
     expect(alchOf(axe, 'instant', 94, 1200)!.gph).toBeCloseTo(1_306 * 17.5);
   });
+  it('does not assume a dipped last price is still available', () => {
+    const dipped = item({ highalch: 768, high: 400, low: 390, avgHigh1h: 440, avgLow1h: 425, limit: 18_000 });
+    expect(alchOf(dipped, 'instant', 94, 1200)!.price).toBe(440);
+    expect(alchOf(dipped, 'patient', 94, 1200)!.price).toBe(425);
+    const rising = item({ highalch: 768, high: 460, low: 450, avgHigh1h: 440, avgLow1h: 425 });
+    expect(alchOf(rising, 'instant', 94, 1200)!.price).toBe(460);
+  });
 });
 
 describe('setArbitrage', () => {
