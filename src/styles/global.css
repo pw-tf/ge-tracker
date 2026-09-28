@@ -1484,3 +1484,117 @@ span.th {
     grid-template-columns: minmax(0, 1fr) 100px 100px;
   }
 }
+
+/* ---------- Fill confidence & tags ---------- */
+
+.pill.conf {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  gap: 6px;
+}
+.conf-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 10px;
+}
+.conf-bars span {
+  width: 3px;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0.25;
+}
+.conf-bars span:nth-child(1) {
+  height: 4px;
+}
+.conf-bars span:nth-child(2) {
+  height: 7px;
+}
+.conf-bars span:nth-child(3) {
+  height: 10px;
+}
+.conf-bars.low span:nth-child(1),
+.conf-bars.med span:nth-child(-n + 2),
+.conf-bars.high span {
+  opacity: 1;
+}
+.tags {
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  line-height: 14px;
+  white-space: nowrap;
+  cursor: help;
+}
+.tag.down {
+  background: var(--downbg);
+  color: var(--down);
+}
+.tag.up {
+  background: var(--upbg);
+  color: var(--up);
+}
+.tag.gold {
+  background: var(--goldbg);
+  color: var(--gold);
+}
+.tag.neutral {
+  background: var(--panel2);
+  color: var(--muted);
+  border: 1px solid var(--line2);
+}
+.last-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  font-family: var(--font-num);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.hour-strip {
+  display: grid;
+  grid-template-columns: repeat(24, minmax(0, 1fr));
+  gap: 2px;
+}
+.hour-strip span {
+  height: 22px;
+  border-radius: 3px;
+}
+.hour-strip .pos {
+  background: var(--up);
+}
+.hour-strip .neg {
+  background: var(--down);
+  opacity: 0.7;
+}
+.hour-strip .none {
+  background: transparent;
+  border: 1px dashed var(--line2);
+}
+.card-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.item-sub .tags {
+  margin-left: 4px;
+}
+.reasons {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}

@@ -5,13 +5,14 @@ import { fetchTimeseries, wikiUrl, type Timestep } from '../api/wiki';
 import { Field, Segmented } from '../components/Controls';
 import { fmtAgeMin } from '../components/FlipList';
 import { Icon } from '../components/Icon';
-import { ItemIcon, scoreBreakdown, scoreColor } from '../components/ItemBits';
+import { ConfidencePill, ItemIcon, scoreBreakdown, scoreColor } from '../components/ItemBits';
 import { PriceChart } from '../components/PriceChart';
 import { MobileBar } from '../components/Shell';
 import { Empty, MarketError } from '../components/Status';
 import { useIsMobile, useNow } from '../hooks/useNow';
 import { breakEvenSell, flipOf, geTax, NATURE_RUNE_ID, TIER_LABEL } from '../lib/calc';
 import { fmtFull, fmtPct, fmtShort, parseGp, signed } from '../lib/format';
+import { marginHistory, TAG_INFO } from '../lib/predict';
 import { useMarket } from '../state/market';
 import { isWatched, toggleWatch, useWatchlist } from '../state/watchlist';
 import { useSettings } from '../state/settings';
@@ -63,6 +64,15 @@ function ItemDetailPage({ id }: { id: number }) {
     staleTime: step === '5m' ? 60_000 : 5 * 60_000,
   });
   const points = useMemo(() => (ts.data ?? []).slice(-WINDOW[step].n), [ts.data, step]);
+  // Hourly series for the margin-history check (shared with the chart when step = 1h).
+  const hourly = useQuery({
+    queryKey: ['ts', id, '1h'],
+    queryFn: ({ signal }) => fetchTimeseries(id, '1h', signal),
+    enabled: Number.isFinite(id),
+    staleTime: 5 * 60_000,
+  });
+  const exempt = item?.taxExempt ?? false;
+  const history = useMemo(() => (hourly.data ? marginHistory(hourly.data, exempt) : null), [hourly.data, exempt]);
 
   const flip = item ? flipOf(item, { bankroll: parseGp(bankroll), now }) : null;
   const [calc, setCalc] = useState<{ q: string; b: string; s: string } | null>(null);
@@ -133,13 +143,23 @@ function ItemDetailPage({ id }: { id: number }) {
 
   const stats = (
     <div className="stat-grid">
-      <Stat label="Instant buy (sell here)" swatch="hi" value={item.high != null ? fmtFull(item.high) : '—'} sub={item.highTime ? `Traded ${fmtAgeMin((nowS - item.highTime) / 60)} ago` : 'No recent trade'} />
-      <Stat label="Instant sell (buy here)" swatch="lo" value={item.low != null ? fmtFull(item.low) : '—'} sub={item.lowTime ? `Traded ${fmtAgeMin((nowS - item.lowTime) / 60)} ago` : 'No recent trade'} />
+      <Stat
+        label="Buy at (offer)"
+        swatch="lo"
+        value={flip ? fmtFull(flip.buy) : '—'}
+        sub={item.low != null ? `Last trade ${fmtFull(item.low)}${item.lowTime ? ` · ${fmtAgeMin((nowS - item.lowTime) / 60)} ago` : ''}` : 'No recent trade'}
+      />
+      <Stat
+        label="Sell at (offer)"
+        swatch="hi"
+        value={flip ? fmtFull(flip.sell) : '—'}
+        sub={item.high != null ? `Last trade ${fmtFull(item.high)}${item.highTime ? ` · ${fmtAgeMin((nowS - item.highTime) / 60)} ago` : ''}` : 'No recent trade'}
+      />
       <Stat
         label="Margin after tax"
         value={flip ? signed(flip.margin, fmtFull) : '—'}
         color={flip ? (flip.margin > 0 ? 'var(--up)' : 'var(--down)') : undefined}
-        sub={flip ? `Tax ${fmtFull(flip.tax)} per item` : undefined}
+        sub={flip ? `Tax ${fmtFull(flip.tax)} · last trades ${signed(flip.lastMargin, fmtFull)}` : undefined}
       />
       <Stat label="ROI" value={flip ? fmtPct(flip.roi) : '—'} color={flip ? (flip.margin > 0 ? 'var(--up)' : 'var(--down)') : undefined} sub="per flip cycle" />
       <Stat
@@ -160,7 +180,7 @@ function ItemDetailPage({ id }: { id: number }) {
             '—'
           )
         }
-        sub={flip ? scoreBreakdown(flip.score).replace(/\/\d+/g, '').replace('Freshness', 'Fresh').replace('Volume', 'Vol') : undefined}
+        sub={flip ? scoreBreakdown(flip.score).replace(/\/\d+/g, '').replace('Confidence', 'Fill').replace('Volume', 'Vol') : undefined}
       />
     </div>
   );
@@ -234,8 +254,70 @@ function ItemDetailPage({ id }: { id: number }) {
     </section>
   );
 
+  const fillPanel = flip && (
+    <section className="panel panel-pad" aria-label="Will it fill?">
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <h2>Will it fill?</h2>
+        <ConfidencePill c={flip.confidence} />
+      </div>
+      <ul className="reasons">
+        {flip.confidence.reasons.map((r) => (
+          <li key={r}>{r}</li>
+        ))}
+      </ul>
+      {flip.tags.map((t) => (
+        <div key={t} className="row" style={{ gap: 8, flexWrap: 'nowrap', alignItems: 'flex-start' }}>
+          <span className={'tag ' + TAG_INFO[t].tone}>{TAG_INFO[t].label}</span>
+          <span className="panel-sub">{TAG_INFO[t].tip}</span>
+        </div>
+      ))}
+      <div className="filter-group" style={{ gap: 8 }}>
+        <div className="section-label">Margin history · last 24 hours</div>
+        {history && history.hours.length > 0 ? (
+          <>
+            <div className="kv total" style={{ borderTop: 'none', paddingTop: 0 }}>
+              <span>Profitable hours</span>
+              <span className={history.positive >= history.counted / 2 ? 'up' : 'down'}>
+                {history.positive} of {history.counted}
+              </span>
+            </div>
+            <div
+              className="hour-strip"
+              role="img"
+              aria-label={`Hourly after-tax margin: profitable in ${history.positive} of ${history.counted} hours with trades on both sides.`}
+            >
+              {history.hours.map((h) => (
+                <span
+                  key={h.timestamp}
+                  className={h.margin == null ? 'none' : h.margin > 0 ? 'pos' : 'neg'}
+                  title={`${new Date(h.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}: ${
+                    h.margin == null ? 'no trades on one side' : signed(h.margin, fmtFull)
+                  }`}
+                />
+              ))}
+            </div>
+            <div className="row muted" style={{ justifyContent: 'space-between', fontSize: 11 }}>
+              <span>24h ago</span>
+              <span>Now</span>
+            </div>
+            <div className="panel-sub">Green: profitable after tax · red: not · dashed: no trades on one side</div>
+            <div className="kv">
+              <span>Median hourly margin</span>
+              <span className={history.median != null && history.median > 0 ? 'up' : 'down'}>{history.median != null ? signed(history.median, fmtFull) : '—'}</span>
+            </div>
+          </>
+        ) : hourly.isPending ? (
+          <div className="skeleton" style={{ height: 60, borderTop: 'none', borderRadius: 8 }} />
+        ) : (
+          <div className="panel-sub">No hourly history for this item.</div>
+        )}
+      </div>
+    </section>
+  );
+
   const side = (
     <div className="stack">
+      {!mobile && fillPanel}
       <section className="panel panel-pad" aria-label="Flip calculator">
         <h2>Flip calculator</h2>
         <div className="filter-grid" style={{ gridTemplateColumns: '80px minmax(0,1fr) minmax(0,1fr)' }}>
@@ -344,6 +426,7 @@ function ItemDetailPage({ id }: { id: number }) {
           <MarketError />
           {header}
           {stats}
+          {fillPanel}
           {chart}
           {side}
         </main>

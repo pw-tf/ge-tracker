@@ -1,9 +1,11 @@
 import type { Flip, Tier } from './calc';
+import type { ConfLevel } from './predict';
 import { parseGp } from './format';
 
 export type MemberFilter = 'all' | 'mem' | 'f2p';
 export type TierFilter = 'all' | Tier;
-export type FlipSortKey = 'name' | 'buy' | 'sell' | 'margin' | 'roi' | 'limit' | 'ppl' | 'vol' | 'age' | 'score';
+export type FlipSortKey = 'name' | 'last' | 'buy' | 'sell' | 'margin' | 'roi' | 'limit' | 'ppl' | 'vol' | 'age' | 'conf' | 'score';
+export type ConfFilter = 'any' | Exclude<ConfLevel, 'low'>;
 
 /** Numeric filter fields, kept as the raw text the player typed. */
 export const NUMERIC_FILTERS = ['minMargin', 'minRoi', 'minVol', 'maxAge', 'priceMin', 'priceMax', 'minLimit', 'maxCost'] as const;
@@ -12,6 +14,7 @@ export type NumericFilter = (typeof NUMERIC_FILTERS)[number];
 export type FlipFilters = Record<NumericFilter, string> & {
   tier: TierFilter;
   member: MemberFilter;
+  minConf: ConfFilter;
   q: string;
   sort: FlipSortKey;
   dir: 'asc' | 'desc';
@@ -20,6 +23,7 @@ export type FlipFilters = Record<NumericFilter, string> & {
 export const DEFAULT_FILTERS: FlipFilters = {
   tier: 'all',
   member: 'all',
+  minConf: 'any',
   q: '',
   sort: 'score',
   dir: 'desc',
@@ -35,10 +39,10 @@ export const DEFAULT_FILTERS: FlipFilters = {
 
 const blank = Object.fromEntries(NUMERIC_FILTERS.map((k) => [k, ''])) as Record<NumericFilter, string>;
 
-export const PRESETS: { label: string; values: Record<NumericFilter, string> }[] = [
-  { label: 'Safe & liquid', values: { ...blank, minRoi: '1', minVol: '500', maxAge: '10' } },
-  { label: 'Big margins', values: { ...blank, minMargin: '50k', minVol: '5', maxAge: '60' } },
-  { label: 'Cheap bulk', values: { ...blank, minRoi: '1.5', minVol: '1000', priceMax: '20k', minLimit: '2000' } },
+export const PRESETS: { label: string; values: Record<NumericFilter, string> & { minConf: ConfFilter } }[] = [
+  { label: 'Safe & liquid', values: { ...blank, minConf: 'high', minRoi: '1', minVol: '500', maxAge: '10' } },
+  { label: 'Big margins', values: { ...blank, minConf: 'any', minMargin: '50k', minVol: '5', maxAge: '60' } },
+  { label: 'Cheap bulk', values: { ...blank, minConf: 'med', minRoi: '1.5', minVol: '1000', priceMax: '20k', minLimit: '2000' } },
 ];
 
 export const FILTER_FIELDS: { title: string; fields: { key: NumericFilter; label: string; placeholder: string }[] }[] = [
@@ -68,7 +72,7 @@ export const FILTER_FIELDS: { title: string; fields: { key: NumericFilter; label
 ];
 
 export function activeFilterCount(f: FlipFilters): number {
-  return NUMERIC_FILTERS.filter((k) => f[k].trim() !== '').length + (f.member !== 'all' ? 1 : 0);
+  return NUMERIC_FILTERS.filter((k) => f[k].trim() !== '').length + (f.member !== 'all' ? 1 : 0) + (f.minConf !== 'any' ? 1 : 0);
 }
 
 /** Every filter except the price tier, so tier chips can show their counts. */
@@ -83,6 +87,8 @@ export function filterFlips(flips: Flip[], f: FlipFilters): Flip[] {
   const maxCost = parseGp(f.maxCost);
   const q = f.q.trim().toLowerCase();
   return flips.filter((x) => {
+    if (f.minConf === 'high' && x.confidence.level !== 'high') return false;
+    if (f.minConf === 'med' && x.confidence.level === 'low') return false;
     if (f.member === 'mem' && !x.item.members) return false;
     if (f.member === 'f2p' && x.item.members) return false;
     if (q && !x.item.name.toLowerCase().includes(q)) return false;
@@ -100,6 +106,7 @@ export function filterFlips(flips: Flip[], f: FlipFilters): Flip[] {
 
 const SORT_VALUE: Record<FlipSortKey, (x: Flip) => number | string> = {
   name: (x) => x.item.name,
+  last: (x) => x.lastMargin,
   buy: (x) => x.buy,
   sell: (x) => x.sell,
   margin: (x) => x.margin,
@@ -108,6 +115,7 @@ const SORT_VALUE: Record<FlipSortKey, (x: Flip) => number | string> = {
   ppl: (x) => x.ppl,
   vol: (x) => x.item.vol1h,
   age: (x) => x.ageMin,
+  conf: (x) => x.confidence.value,
   score: (x) => x.score.total,
 };
 

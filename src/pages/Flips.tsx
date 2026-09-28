@@ -25,6 +25,7 @@ const TIERS: { value: TierFilter; label: string; short: string }[] = [
 
 const SORT_OPTIONS: { value: FlipSortKey; label: string }[] = [
   { value: 'score', label: 'Flip score' },
+  { value: 'conf', label: 'Fill confidence' },
   { value: 'ppl', label: 'Profit per limit' },
   { value: 'roi', label: 'ROI' },
   { value: 'margin', label: 'Margin' },
@@ -186,7 +187,7 @@ export function FlipsPage() {
       <div className="page-head">
         <div>
           <h1>Margin flips</h1>
-          <p>Buy at the instant-sell price, sell at the instant-buy price. Profit is after the 2% GE tax (capped at 5M per item).</p>
+          <p>Buy at and Sell at are realistic offers anchored to recent averages, so spikes don’t inflate the margin. Profit is after the 2% GE tax (capped at 5M per item).</p>
         </div>
         {tierChips}
       </div>

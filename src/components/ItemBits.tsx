@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { iconUrl } from '../api/wiki';
 import { TIER_LABEL, type Tier } from '../lib/calc';
 import { monogram } from '../lib/format';
+import { CONF_LABEL, TAG_INFO, type Confidence, type Tag } from '../lib/predict';
 import type { ScoreParts } from '../lib/score';
 import type { Item } from '../lib/types';
 import { isWatched, toggleWatch, useWatchlist } from '../state/watchlist';
@@ -76,7 +77,7 @@ export function scoreColor(total: number): string {
 
 export function scoreBreakdown(s: ScoreParts): string {
   const r = (n: number) => Math.round(n);
-  return `ROI ${r(s.roi)}/30 · Profit ${r(s.profit)}/25 · Volume ${r(s.volume)}/25 · Freshness ${r(s.fresh)}/20`;
+  return `ROI ${r(s.roi)}/30 · Profit ${r(s.profit)}/25 · Volume ${r(s.volume)}/25 · Confidence ${r(s.confidence)}/20`;
 }
 
 export function ScoreBar({ score }: { score: ScoreParts }) {
@@ -101,5 +102,36 @@ export function ScoreChip({ score }: { score: ScoreParts }) {
       </span>
       <span>score</span>
     </div>
+  );
+}
+
+const CONF_CLASS = { high: 'up', med: 'gold', low: 'neutral' } as const;
+
+/** High / Medium / Low fill confidence, with its reasons on hover. */
+export function ConfidencePill({ c, compact = false }: { c: Confidence; compact?: boolean }) {
+  const text = compact ? CONF_LABEL[c.level] : `${CONF_LABEL[c.level]} fill`;
+  return (
+    <span className={'pill conf ' + CONF_CLASS[c.level]} title={c.reasons.join(' · ')} aria-label={`Fill confidence ${CONF_LABEL[c.level]}. ${c.reasons.join('. ')}`}>
+      <span className={'conf-bars ' + c.level} aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </span>
+      {text}
+    </span>
+  );
+}
+
+/** Warning tags such as Spike, Falling or Thin. */
+export function TagList({ tags }: { tags: Tag[] }) {
+  if (!tags.length) return null;
+  return (
+    <span className="tags">
+      {tags.map((t) => (
+        <span key={t} className={'tag ' + TAG_INFO[t].tone} title={TAG_INFO[t].tip}>
+          {TAG_INFO[t].label}
+        </span>
+      ))}
+    </span>
   );
 }

@@ -1,4 +1,4 @@
-import { FILTER_FIELDS, PRESETS, activeFilterCount, type FlipFilters, type MemberFilter } from '../lib/filters';
+import { FILTER_FIELDS, PRESETS, activeFilterCount, type ConfFilter, type FlipFilters, type MemberFilter } from '../lib/filters';
 import { Field, Segmented } from './Controls';
 import { Icon } from './Icon';
 
@@ -63,6 +63,23 @@ export function FilterPanel({ filters, setFilters, reset, idPrefix, showHeader =
           </div>
         </div>
       ))}
+
+      <div className="filter-group">
+        <div className="section-label" title="How likely the suggested offers are to fill: liquidity, margin stability, spikes and trend">
+          Fill confidence
+        </div>
+        <Segmented<ConfFilter>
+          label="Minimum fill confidence"
+          className="fill"
+          value={filters.minConf}
+          onChange={(minConf) => setFilters({ minConf })}
+          options={[
+            { value: 'any', label: 'Any' },
+            { value: 'med', label: 'Medium+' },
+            { value: 'high', label: 'High' },
+          ]}
+        />
+      </div>
 
       <div className="filter-group">
         <div className="section-label">Membership</div>

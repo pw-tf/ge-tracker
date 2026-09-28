@@ -21,6 +21,7 @@ function item(over: Partial<Item> = {}): Item {
   return {
     id: 1, name: 'Test item', examine: '', members: true, limit: 70, highalch: null, value: 0, icon: 'Test.png', taxExempt: false,
     high: null, highTime: null, low: null, lowTime: null,
+    avgHigh5m: null, avgLow5m: null, volHigh5m: 0, volLow5m: 0,
     avgHigh1h: null, avgLow1h: null, volHigh1h: 0, volLow1h: 0, vol1h: 0,
     avgHigh24h: null, avgLow24h: null, vol24h: 0,
     ...over,
@@ -97,19 +98,20 @@ describe('flipOf', () => {
 
 describe('flipScore', () => {
   it('is zero for unprofitable flips', () => {
-    expect(flipScore({ margin: -1, roi: 5, ppl: 1e6, vol1h: 1e4, ageMin: 1 }).total).toBe(0);
+    expect(flipScore({ margin: -1, roi: 5, ppl: 1e6, vol1h: 1e4, confidence: 1 }).total).toBe(0);
   });
   it('matches the design example for the whip', () => {
-    expect(flipScore({ margin: 7_440, roi: 0.5345, ppl: 520_800, vol1h: 64, ageMin: 6 }).total).toBe(55);
+    expect(flipScore({ margin: 7_440, roi: 0.5345, ppl: 520_800, vol1h: 64, confidence: 1 }).total).toBe(55);
   });
   it('maxes at 100', () => {
-    expect(flipScore({ margin: 1, roi: 50, ppl: 1e9, vol1h: 1e6, ageMin: 0 }).total).toBe(100);
+    expect(flipScore({ margin: 1, roi: 50, ppl: 1e9, vol1h: 1e6, confidence: 1 }).total).toBe(100);
   });
-  it('penalises stale trades', () => {
-    const fresh = flipScore({ margin: 1, roi: 1, ppl: 1e5, vol1h: 100, ageMin: 2 });
-    const stale = flipScore({ margin: 1, roi: 1, ppl: 1e5, vol1h: 100, ageMin: 60 });
-    expect(fresh.fresh).toBe(20);
-    expect(stale.fresh).toBe(0);
+  it('rewards fill confidence', () => {
+    const sure = flipScore({ margin: 1, roi: 1, ppl: 1e5, vol1h: 100, confidence: 1 });
+    const unsure = flipScore({ margin: 1, roi: 1, ppl: 1e5, vol1h: 100, confidence: 0 });
+    expect(sure.confidence).toBe(20);
+    expect(unsure.confidence).toBe(0);
+    expect(sure.total - unsure.total).toBe(20);
   });
 });
 

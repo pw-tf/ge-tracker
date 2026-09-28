@@ -19,6 +19,12 @@ export interface Item {
   low: number | null;
   lowTime: number | null;
 
+  /** Average prices and trade counts over the last 5 minutes. */
+  avgHigh5m: number | null;
+  avgLow5m: number | null;
+  volHigh5m: number;
+  volLow5m: number;
+
   avgHigh1h: number | null;
   avgLow1h: number | null;
   /** Trades at the high price in the last hour. */

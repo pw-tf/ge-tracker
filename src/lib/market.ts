@@ -8,12 +8,14 @@ export function buildItems(
   latest: Record<string, LatestEntry> | undefined,
   avg1h: Record<string, AvgEntry> | undefined,
   avg24h: Record<string, AvgEntry> | undefined,
+  avg5m?: Record<string, AvgEntry>,
 ): Item[] {
   return mapping.map((m) => {
     const key = String(m.id);
     const l = latest?.[key];
     const h1 = avg1h?.[key];
     const d1 = avg24h?.[key];
+    const m5 = avg5m?.[key];
     const volHigh1h = h1?.highPriceVolume ?? 0;
     const volLow1h = h1?.lowPriceVolume ?? 0;
     return {
@@ -30,6 +32,10 @@ export function buildItems(
       highTime: l?.highTime ?? null,
       low: l?.low ?? null,
       lowTime: l?.lowTime ?? null,
+      avgHigh5m: m5?.avgHighPrice ?? null,
+      avgLow5m: m5?.avgLowPrice ?? null,
+      volHigh5m: m5?.highPriceVolume ?? 0,
+      volLow5m: m5?.lowPriceVolume ?? 0,
       avgHigh1h: h1?.avgHighPrice ?? null,
       avgLow1h: h1?.avgLowPrice ?? null,
       volHigh1h,

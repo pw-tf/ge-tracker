@@ -1,33 +1,12 @@
 import type { Item } from './types';
 import { flipScore, type ScoreParts } from './score';
+import { afterTax, geTax } from './tax';
+import { confidenceOf, offersOf, tagsOf, type Confidence, type Tag } from './predict';
 
-export const TAX_RATE = 0.02;
-export const TAX_CAP = 5_000_000;
-/** Items sold for less than this pay no tax (2% of 49 floors to 0). */
-export const TAX_FLOOR = 50;
+export { TAX_CAP, TAX_FLOOR, TAX_RATE, afterTax, breakEvenSell, geTax } from './tax';
+
 export const NATURE_RUNE_ID = 561;
 export const BUY_LIMIT_WINDOW_HOURS = 4;
-
-/** GE tax on a single item sold at `price`: 2%, rounded down, capped at 5M per item. */
-export function geTax(price: number, exempt = false): number {
-  if (exempt || price < TAX_FLOOR) return 0;
-  return Math.min(Math.floor(price * TAX_RATE), TAX_CAP);
-}
-
-/** What you actually receive for one item after tax. */
-export function afterTax(price: number, exempt = false): number {
-  return price - geTax(price, exempt);
-}
-
-/** Lowest sell price that at least breaks even on an item bought at `buy`. */
-export function breakEvenSell(buy: number, exempt = false): number {
-  if (exempt || buy < TAX_FLOOR) return buy;
-  // Start just under the estimate (tax is floored) and step up to the first price that covers the buy.
-  let p = Math.max(buy, Math.floor(buy / (1 - TAX_RATE)) - 2);
-  if (geTax(p) >= TAX_CAP) return buy + TAX_CAP;
-  while (afterTax(p) < buy) p++;
-  return p;
-}
 
 export type Tier = 'low' | 'med' | 'high';
 export const TIER_LABEL: Record<Tier, string> = { low: 'Low', med: 'Medium', high: 'High' };
@@ -48,19 +27,28 @@ export function affordableQty(limit: number | null, buy: number, bankroll: numbe
 
 export interface Flip {
   item: Item;
-  /** Buy at the instant-sell (low) price. */
+  /** Realistic buy offer (see predict.ts). */
   buy: number;
-  /** Sell at the instant-buy (high) price. */
+  /** Realistic sell offer. */
   sell: number;
   tax: number;
+  /** After-tax margin at the realistic offers. */
   margin: number;
   roi: number;
   qty: number;
-  /** Profit if a full (affordable) buy limit is flipped. */
+  /** Profit if a full (affordable) buy limit is flipped at the realistic offers. */
   ppl: number;
   tier: Tier;
+  /** Latest instant-sell trade (the raw "buy" price). */
+  lastBuy: number;
+  /** Latest instant-buy trade (the raw "sell" price). */
+  lastSell: number;
+  /** After-tax margin between the two last trades. */
+  lastMargin: number;
   /** Minutes since the older of the two latest trades. */
   ageMin: number;
+  tags: Tag[];
+  confidence: Confidence;
   score: ScoreParts;
 }
 
@@ -71,9 +59,10 @@ export interface FlipOptions {
 }
 
 export function flipOf(item: Item, { bankroll, now }: FlipOptions): Flip | null {
-  if (item.high == null || item.low == null || item.low <= 0) return null;
-  const buy = item.low;
-  const sell = item.high;
+  const offers = offersOf(item);
+  if (!offers || item.high == null || item.low == null || offers.buyAt <= 0) return null;
+  const buy = offers.buyAt;
+  const sell = offers.sellAt;
   const tax = geTax(sell, item.taxExempt);
   const margin = sell - tax - buy;
   const roi = (margin / buy) * 100;
@@ -81,6 +70,8 @@ export function flipOf(item: Item, { bankroll, now }: FlipOptions): Flip | null 
   const ppl = margin * qty;
   const oldest = Math.min(item.highTime ?? 0, item.lowTime ?? 0);
   const ageMin = Math.max(0, (now - oldest) / 60);
+  const tags = tagsOf(item, ageMin);
+  const confidence = confidenceOf(item, tags);
   return {
     item,
     buy,
@@ -91,8 +82,13 @@ export function flipOf(item: Item, { bankroll, now }: FlipOptions): Flip | null 
     qty,
     ppl,
     tier: tierOf(buy),
+    lastBuy: item.low,
+    lastSell: item.high,
+    lastMargin: afterTax(item.high, item.taxExempt) - item.low,
     ageMin,
-    score: flipScore({ margin, roi, ppl, vol1h: item.vol1h, ageMin }),
+    tags,
+    confidence,
+    score: flipScore({ margin, roi, ppl, vol1h: item.vol1h, confidence: confidence.value }),
   };
 }
 

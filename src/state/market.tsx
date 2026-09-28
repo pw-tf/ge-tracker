@@ -20,6 +20,12 @@ function useMarketData() {
     refetchInterval: MINUTE,
     staleTime: 30_000,
   });
+  const avg5m = useQuery({
+    queryKey: ['avg', '5m'],
+    queryFn: ({ signal }) => fetchAverages('5m', signal),
+    refetchInterval: MINUTE,
+    staleTime: 30_000,
+  });
   const avg1h = useQuery({
     queryKey: ['avg', '1h'],
     queryFn: ({ signal }) => fetchAverages('1h', signal),
@@ -34,8 +40,8 @@ function useMarketData() {
   });
 
   const items = useMemo<Item[]>(
-    () => (mapping.data ? buildItems(mapping.data, latest.data, avg1h.data, avg24h.data) : []),
-    [mapping.data, latest.data, avg1h.data, avg24h.data],
+    () => (mapping.data ? buildItems(mapping.data, latest.data, avg1h.data, avg24h.data, avg5m.data) : []),
+    [mapping.data, latest.data, avg1h.data, avg24h.data, avg5m.data],
   );
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   const byName = useMemo(() => new Map(items.map((i) => [i.name, i])), [items]);
@@ -51,6 +57,7 @@ function useMarketData() {
     fetching: latest.isFetching || avg1h.isFetching,
     refresh: () => {
       void latest.refetch();
+      void avg5m.refetch();
       void avg1h.refetch();
     },
   };

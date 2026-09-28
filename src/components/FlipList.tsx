@@ -1,24 +1,25 @@
 import type { Flip } from '../lib/calc';
 import type { FlipSortKey } from '../lib/filters';
 import { fmtFull, fmtPct, fmtShort, signed } from '../lib/format';
-import { ItemCell, ItemIcon, ItemName, ScoreBar, ScoreChip, StarButton, TierDot } from './ItemBits';
+import { ConfidencePill, ItemIcon, ItemName, ScoreBar, ScoreChip, StarButton, TagList, TierDot } from './ItemBits';
 import { TIER_LABEL } from '../lib/calc';
 
 const COLS: { key: FlipSortKey; label: string; right: boolean; title?: string }[] = [
   { key: 'name', label: 'Item', right: false },
-  { key: 'buy', label: 'Buy', right: true, title: 'Latest instant-sell price: offer here to buy' },
-  { key: 'sell', label: 'Sell', right: true, title: 'Latest instant-buy price: offer here to sell' },
-  { key: 'margin', label: 'Margin', right: true, title: 'Sell − 2% GE tax − buy' },
+  { key: 'last', label: 'Last trade', right: true, title: 'The two most recent trades (buy / sell) and their margin. Often a spike: see Buy at / Sell at' },
+  { key: 'buy', label: 'Buy at', right: true, title: 'Realistic buy offer: the last buy-side trade, but not below the recent average' },
+  { key: 'sell', label: 'Sell at', right: true, title: 'Realistic sell offer: the last sell-side trade, but not above the recent average' },
+  { key: 'margin', label: 'Margin', right: true, title: 'Sell at − 2% GE tax − Buy at' },
   { key: 'roi', label: 'ROI', right: true },
-  { key: 'limit', label: 'Limit', right: true, title: 'GE buy limit per 4 hours' },
-  { key: 'ppl', label: 'Profit / limit', right: true, title: 'Margin × buy limit, capped by your cash stack' },
+  { key: 'ppl', label: 'Per limit', right: true, title: 'Margin × buy limit (per 4h), capped by your cash stack' },
   { key: 'vol', label: 'Vol 1h', right: true, title: 'Trades in the last hour' },
-  { key: 'age', label: 'Age', right: true, title: 'Time since the older of the two latest trades' },
-  { key: 'score', label: 'Flip score', right: true, title: 'ROI, profit, volume and freshness combined (0–100)' },
+  { key: 'conf', label: 'Fill', right: true, title: 'Fill confidence: liquidity, margin stability, spikes and trend' },
+  { key: 'score', label: 'Flip score', right: true, title: 'ROI, profit, volume and fill confidence combined (0–100)' },
 ];
 
 const GRID =
-  '28px minmax(180px,2.3fr) minmax(0,1.1fr) minmax(0,1.1fr) minmax(0,.9fr) minmax(0,.75fr) minmax(0,.6fr) minmax(0,1.1fr) minmax(0,.75fr) minmax(0,.7fr) 88px';
+  '28px minmax(210px,2.3fr) minmax(0,1.05fr) minmax(0,1.05fr) minmax(0,1.05fr) minmax(0,.9fr) minmax(0,.7fr) minmax(0,1fr) minmax(0,.7fr) 88px 84px';
+const MIN_W = '1040px';
 
 function pplCell(f: Flip) {
   if (f.item.limit == null) return { main: '—', sub: 'limit unknown', dim: true };
@@ -45,7 +46,7 @@ export function FlipTable({
     <div className="panel table">
       <div className="table-scroll">
         <div role="table" aria-label="Margin flips" aria-rowcount={flips.length}>
-          <div className="thead" role="row" style={{ ['--cols' as string]: GRID, ['--min-w' as string]: '980px' }}>
+          <div className="thead" role="row" style={{ ['--cols' as string]: GRID, ['--min-w' as string]: MIN_W }}>
             <span role="columnheader" className="th">
               <span className="sr-only">Watch</span>
             </span>
@@ -66,25 +67,42 @@ export function FlipTable({
             const p = pplCell(f);
             const up = f.margin > 0;
             return (
-              <div key={f.item.id} className="trow" role="row" style={{ ['--cols' as string]: GRID, ['--min-w' as string]: '980px' }}>
+              <div key={f.item.id} className="trow" role="row" style={{ ['--cols' as string]: GRID, ['--min-w' as string]: MIN_W }}>
                 <span role="cell">
                   <StarButton item={f.item} />
                 </span>
                 <div role="cell" style={{ minWidth: 0 }}>
-                  <ItemCell item={f.item} tier={f.tier} />
+                  <div className="item-cell">
+                    <ItemIcon item={f.item} />
+                    <div className="meta">
+                      <ItemName item={f.item} />
+                      <div className="item-sub">
+                        <TierDot tier={f.tier} />
+                        {TIER_LABEL[f.tier]} · {f.item.members ? 'Mem' : 'F2P'}
+                        <TagList tags={f.tags} />
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div role="cell" className="cell">{fmtFull(f.buy)}</div>
-                <div role="cell" className="cell">{fmtFull(f.sell)}</div>
+                <div role="cell" className="last-cell" title={`Last trades ${fmtAgeMin(f.ageMin)} ago`}>
+                  <span>
+                    {fmtShort(f.lastBuy)} / {fmtShort(f.lastSell)}
+                  </span>
+                  <span className={f.lastMargin > 0 ? 'up' : 'down'} style={{ opacity: 0.85 }}>
+                    {signed(f.lastMargin)} · {fmtAgeMin(f.ageMin)}
+                  </span>
+                </div>
+                <div role="cell" className="cell strong">{fmtFull(f.buy)}</div>
+                <div role="cell" className="cell strong">{fmtFull(f.sell)}</div>
                 <div role="cell" className={'cell strong ' + (up ? 'up' : 'down')}>{signed(f.margin)}</div>
                 <div role="cell" className={'cell ' + (up ? 'up' : 'down')}>{fmtPct(f.roi)}</div>
-                <div role="cell" className="cell muted">{f.item.limit != null ? fmtShort(f.item.limit) : '—'}</div>
                 <div role="cell" className="cell">
                   <span className="strong" style={{ color: p.dim ? 'var(--muted)' : undefined }}>{p.main}</span>
                   <small>{p.sub}</small>
                 </div>
                 <div role="cell" className="cell">{fmtShort(f.item.vol1h)}</div>
-                <div role="cell" className="cell" style={{ color: f.ageMin > 30 ? 'var(--down)' : 'var(--muted)' }}>
-                  {fmtAgeMin(f.ageMin)}
+                <div role="cell" className="cell">
+                  <ConfidencePill c={f.confidence} compact />
                 </div>
                 <div role="cell">
                   <ScoreBar score={f.score} />
@@ -123,6 +141,10 @@ export function FlipCard({ f }: { f: Flip }) {
         <ScoreChip score={f.score} />
         <StarButton item={f.item} touch />
       </div>
+      <div className="card-tags">
+        <ConfidencePill c={f.confidence} />
+        <TagList tags={f.tags} />
+      </div>
       <div className="card-stats">
         <div>
           <span className="k">Buy at</span>
@@ -140,7 +162,9 @@ export function FlipCard({ f }: { f: Flip }) {
         </div>
       </div>
       <div className="card-foot">
-        <span>Limit {f.item.limit != null ? fmtShort(f.item.limit) : '—'}</span>
+        <span title="Last trades (buy / sell)">
+          Last {fmtShort(f.lastBuy)}/{fmtShort(f.lastSell)}
+        </span>
         <span>Vol {fmtShort(f.item.vol1h)}/h</span>
         <span className="strong" style={{ color: p.dim ? 'var(--muted)' : 'var(--gold)' }}>
           {p.main}
