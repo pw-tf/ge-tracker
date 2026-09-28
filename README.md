@@ -40,7 +40,11 @@ Stack: Vite, React, TypeScript, TanStack Query and React Router (hash routing, s
 
 ## Deploying to GitHub Pages
 
-`.github/workflows/deploy.yml` lints, tests and builds every PR, and deploys `main` to GitHub Pages. Turn it on once under **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+`.github/workflows/deploy.yml` lints, tests and builds every push and PR. It publishes the built `dist/` folder to GitHub Pages from the repository's **default branch**.
+
+Set this once: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+
+> If Source is set to *Deploy from a branch*, Pages serves the unbuilt source files. The page is then blank, with `main.tsx 404` in the console. Switch Source to **GitHub Actions** and re-run the workflow (Actions → CI & Pages → Run workflow).
 
 ## Notes
 

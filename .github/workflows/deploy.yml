@@ -2,7 +2,6 @@ name: CI & Pages
 
 on:
   push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -28,13 +27,14 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+      # Only the repository's default branch is published to GitHub Pages.
       - uses: actions/upload-pages-artifact@v3
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch
         with:
           path: dist
 
   deploy:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch
     needs: build
     runs-on: ubuntu-latest
     environment:
